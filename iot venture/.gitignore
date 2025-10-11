@@ -5,7 +5,7 @@
 # build
 **/build
 
-# Remove west environment directories for version controll
+# Remove west environment directories for version control
 **/bootloader
 **/test
 **/.west
