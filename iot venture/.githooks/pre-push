@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Pre-push tests failed."; exit 1' ERR
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+IMAGE="ghcr.io/zephyrproject-rtos/zephyr-build:main"
+APP_DIR="LAB_CI/tests/SUM_UNIT_TEST"
+
+echo ":> Running pre-push CI test..."
+echo "   Repo: $REPO_ROOT"
+echo "   Image: $IMAGE"
+
+# Only pull if missing (avoids hangs)
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo ":> Pulling Zephyr build image..."
+  docker pull "$IMAGE" --quiet
+else
+  echo ":> Using existing local image."
+fi
+
+# Run build + run inside container. If anything fails, docker exits non-zero.
+docker run --rm \
+  -v "$REPO_ROOT":/workdir \
+  -w /workdir \
+  "$IMAGE" bash -lc '
+    set -euo pipefail
+    echo "== Workspace contents =="; ls -la
+
+    # Expect the mono-repo layout you showed (zephyr already present)
+    if [ ! -d "/workdir/zephyr" ]; then
+      echo "ERROR: Expected /workdir/zephyr to exist. Fix your repo layout." >&2
+      exit 1
+    fi
+
+    echo "== west version =="; west --version
+    ls -la
+    echo "== Build native_sim/native/64 =="
+    west build -p always -b native_sim/native/64 /workdir/'"$APP_DIR"' --pristine
+
+    echo "== Run simulator (must pass) =="
+    west build -t run /workdir/'"$APP_DIR"'
+
+    echo "== Build nrf7002dk/nrf5340/cpuapp =="
+    west build -p always -b nrf7002dk/nrf5340/cpuapp LAB_CI --pristine
+  '
+
+echo "Pre-push tests passed."
+exit 0

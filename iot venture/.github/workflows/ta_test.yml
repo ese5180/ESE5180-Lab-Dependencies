@@ -1,0 +1,103 @@
+name: Simple Zephyr CI
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+
+jobs:
+  zephyr-build:
+    name: Build and Run Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️ Checkout your repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: List files after checkout
+        run: |
+          echo "=== Files in repo root ==="
+          ls -a
+          echo "=== LAB_CI contents (if present) ==="
+          ls -a LAB_CI || echo "LAB_CI not found"
+
+      # 2️ Aggressive cleanup to free up disk space
+      - name: Aggressive cleanup
+        run: |
+          echo "Before:"
+          df -h
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/ghc || true
+          # GitHub's own Docker space
+          sudo rm -rf /var/lib/docker || true
+          sudo systemctl stop docker || true
+          # recreate docker dir
+          sudo mkdir -p /var/lib/docker
+          sudo systemctl start docker || true
+          echo "After:"
+          df -h
+
+      # 3️ Pull official Zephyr Docker image
+      - name: Pull Zephyr Docker image
+        run: |
+          echo "=== Checking Docker version ==="
+          docker --version
+          echo "=== Listing current directory ==="
+          ls -a
+          docker pull ghcr.io/zephyrproject-rtos/zephyr-build:main
+          echo "=== Docker images after pull ==="
+          docker images
+
+      # 4️ Build and run your test inside Zephyr container
+      - name: Build and run SUM_UNIT_TEST
+        run: |
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            -e HOME=/workdir/.home \
+            -v "$(pwd):/workdir" -w /workdir \
+            ghcr.io/zephyrproject-rtos/zephyr-build:main bash -lc '
+              set -euo pipefail
+
+              # make sure our fake HOME exists and is writable
+              mkdir -p "$HOME/.cmake/packages"
+
+              # SDK (you already found the path)
+              export ZEPHYR_SDK_INSTALL_DIR=/opt/toolchains/zephyr-sdk-0.17.4
+              export PATH=$ZEPHYR_SDK_INSTALL_DIR/x86_64-zephyr-elf/bin:$PATH
+
+              echo "=== Checking existing west workspace ==="
+              if [ -d /workdir/.west ] && [ -d /workdir/zephyr ]; then
+                echo "=== /workdir is already a west workspace, skipping init ==="
+                cd /workdir
+                west update
+              else
+                echo "=== Initializing new west workspace in /workdir ==="
+                west init -m https://github.com/zephyrproject-rtos/zephyr --mr main /workdir
+                cd /workdir
+                west update
+              fi
+
+              echo "=== Exporting Zephyr package ==="
+              west zephyr-export
+
+              echo "=== Building test ==="
+              west build -p always -b native_sim/native/64 LAB_CI/tests/SUM_UNIT_TEST --pristine
+
+              echo "=== Running test ==="
+              west build -t run LAB_CI/tests/SUM_UNIT_TEST
+
+              echo "== Build nrf7002dk/nrf5340/cpuapp =="
+              west build -p always -b nrf7002dk/nrf5340/cpuapp LAB_CI --pristine
+            '
+
+
+
+      # 5️ Upload build artifacts (optional, to review logs or ELF)
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native_sim-build
+          path: ./build/
