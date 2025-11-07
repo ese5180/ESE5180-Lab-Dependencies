@@ -1,3 +1,3 @@
-[submodule "MEMFAULT"]
-	path = MEMFAULT
+[submodule "MEMFAULT/MEMFAULT_EXAMPLE_FOTA_nrf7002dk"]
+	path = MEMFAULT/MEMFAULT_EXAMPLE_FOTA_nrf7002dk
 	url = git@github.com:ese5180/MEMFAULT_EXAMPLE_FOTA_nrf7002dk.git

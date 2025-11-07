@@ -1,0 +1,3 @@
+# MEMFAULT :
+## MEMFAULT_EXAMPLE_FOTA_nrf7002dk
+LINK (https://github.com/ese5180/MEMFAULT_EXAMPLE_FOTA_nrf7002dk)
