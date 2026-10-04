@@ -2,6 +2,7 @@
  * Ed25519 only call RNG.rand(), so back it with the Zephyr CSPRNG. */
 #ifndef RNG_SHIM_h
 #define RNG_SHIM_h
+#define CRYPTO_RNG_h /* stops the library's own RNG.h from being used */
 #include <stdint.h>
 #include <stddef.h>
 #include <zephyr/kernel.h>
