@@ -2,5 +2,5 @@
 	path = MEMFAULT/MEMFAULT_EXAMPLE_FOTA_nrf7002dk
 	url = git@github.com:ese5180/MEMFAULT_EXAMPLE_FOTA_nrf7002dk.git
 [submodule "lab2 iot security/Crypto"]
-	path = lab2 iot security/Crypto
+	path = lab2_iot_security/Crypto
 	url = https://github.com/OperatorFoundation/Crypto.git
