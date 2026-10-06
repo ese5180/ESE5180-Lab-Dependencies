@@ -39,7 +39,8 @@ static const uint8_t kat_ct[16] = {
 	0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30,
 	0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a};
 
-static uint8_t msg[MSG_LEN], ct[MSG_LEN], pt[MSG_LEN];
+static uint8_t msg[MSG_LEN], pt[MSG_LEN];
+static uint8_t ct[MSG_LEN] __maybe_unused; /* used once you write the timing code */
 
 static inline uint64_t cycles_between(timing_t *a, timing_t *b)
 {
@@ -77,7 +78,7 @@ static int known_answer_test(void)
 int main(void)
 {
 	timing_t t0, t1;
-	uint64_t cold_setup, setup_sum = 0, enc_sum, dec_sum;
+	uint64_t cold_setup, setup_sum = 0, enc_sum = 0, dec_sum = 0;
 	uint8_t key[16];
 
 	for (int i = 0; i < MSG_LEN; i++) {
@@ -113,34 +114,58 @@ int main(void)
 		return 0;
 	}
 
-	/* 3. Warm key setup, averaged */
-	for (int i = 0; i < ITERATIONS; i++) {
-		t0 = timing_counter_get();
-		aes->enc_setup(key);
-		t1 = timing_counter_get();
-		aes->enc_teardown();
-		setup_sum += cycles_between(&t0, &t1);
-	}
+	/*
+	 * ======================= YOUR TASK =======================
+	 * Measure three things for this AES variant and store the TOTAL
+	 * cycles over ITERATIONS runs (printing divides by ITERATIONS):
+	 *   setup_sum  time to get ready with a key
+	 *   enc_sum    time to encrypt msg (176 B)
+	 *   dec_sum    time to decrypt it back
+	 *
+	 * Timing functions (Zephyr <zephyr/timing/timing.h>):
+	 *   timing_t timing_counter_get(void);           read the cycle counter now
+	 *   uint64_t cycles_between(timing_t *t0, timing_t *t1);  cycles from t0 to t1
+	 *
+	 * AES functions (aes_backend.h), all return 0 on success:
+	 *   int  aes->enc_setup(const uint8_t key[16]);  get ready to encrypt
+	 *   int  aes->encrypt(uint8_t *out, const uint8_t *in, size_t len);
+	 *   void aes->enc_teardown(void);                done encrypting
+	 *   int  aes->dec_setup(const uint8_t key[16]);  get ready to decrypt
+	 *   int  aes->decrypt(uint8_t *out, const uint8_t *in, size_t len);
+	 *   void aes->dec_teardown(void);                done decrypting
+	 * Every setup must be followed by its teardown before the next setup.
+	 *
+	 * Only the work being measured goes between t0 and t1.
+	 * =========================================================
+	 */
 
-	/* 4. Encrypt one full payload, many times, with the key already set up */
-	aes->enc_setup(key);
-	t0 = timing_counter_get();
-	for (int i = 0; i < ITERATIONS; i++) {
-		aes->encrypt(ct, msg, MSG_LEN);
-	}
-	t1 = timing_counter_get();
-	aes->enc_teardown();
-	enc_sum = cycles_between(&t0, &t1);
+	/* 1) Key setup time -> setup_sum
+	 *    What: time aes->enc_setup(key) on its own, ITERATIONS times.
+	 *    How:  loop ITERATIONS times { t0 = counter; enc_setup(key);
+	 *          t1 = counter; enc_teardown(); setup_sum += cycles(t0, t1); }
+	 *          (teardown comes after t1, so it is not counted)
+	 */
 
-	/* 5. Decrypt it back */
-	aes->dec_setup(key);
-	t0 = timing_counter_get();
-	for (int i = 0; i < ITERATIONS; i++) {
-		aes->decrypt(pt, ct, MSG_LEN);
+	/* 2) Encryption time -> enc_sum
+	 *    What: time ITERATIONS calls of aes->encrypt(ct, msg, MSG_LEN)
+	 *          with the key already set up.
+	 *    How:  enc_setup(key); t0 = counter;
+	 *          loop ITERATIONS times { encrypt(ct, msg, MSG_LEN); }
+	 *          t1 = counter; enc_teardown(); enc_sum = cycles(t0, t1);
+	 */
+
+	/* 3) Decryption time -> dec_sum
+	 *    What: same as 2), but decrypt ct back into pt.
+	 *    How:  dec_setup(key); t0 = counter;
+	 *          loop ITERATIONS times { decrypt(pt, ct, MSG_LEN); }
+	 *          t1 = counter; dec_teardown(); dec_sum = cycles(t0, t1);
+	 *    The code below checks that pt matches msg.
+	 */
+
+	if (setup_sum == 0 || enc_sum == 0 || dec_sum == 0) {
+		printk("Timing not written yet: complete YOUR TASK in main.c\n");
+		return 0;
 	}
-	t1 = timing_counter_get();
-	aes->dec_teardown();
-	dec_sum = cycles_between(&t0, &t1);
 
 	timing_stop();
 
