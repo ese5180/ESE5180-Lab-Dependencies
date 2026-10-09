@@ -1,0 +1,7 @@
+{
+    "terminal.integrated.stickyScroll.enabled": false,
+    "cmake.ignoreCMakeListsMissing": true,
+    "cmake.configureOnOpen": false,
+    "cmake.enableAutomaticKitScan": false,
+    "cmake.sourceDirectory": "${workspaceFolder}/nonexistent"
+}
