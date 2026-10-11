@@ -1,0 +1,23 @@
+/ {
+    chosen {
+        zephyr,storage-script = &storage_partition;
+    };
+};
+
+/* Removes the DTS definition of the storage partition so it can be redefined below */
+/delete-node/ &storage_partition;
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        /* Reserve the last 2 pages (4KB total) of STM32WL flash for NVS */
+        storage_partition: partition@3f000 {
+            label = "storage";
+            reg = <0x0003f000 DT_SIZE_K(4)>;
+        };
+    };
+};
+
